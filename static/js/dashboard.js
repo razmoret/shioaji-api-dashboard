@@ -180,15 +180,15 @@ function renderOrdersTable() {
     }
     
     let html = `<table><thead><tr>
-        <th style="width:100px">時間</th>
-        <th style="width:40px">#</th>
-        <th style="width:150px">商品</th>
-        <th style="width:60px">動作</th>
-        <th style="width:40px">口數</th>
-        <th style="width:65px">狀態</th>
-        <th style="width:120px">成交</th>
-        <th>訊息</th>
-        <th style="width:40px"></th>
+        <th style="width:10%">時間</th>
+        <th style="width:4%">#</th>
+        <th style="width:12%">商品</th>
+        <th style="width:7%">動作</th>
+        <th style="width:5%">口數</th>
+        <th style="width:8%">狀態</th>
+        <th style="width:13%">成交</th>
+        <th style="width:37%">訊息</th>
+        <th style="width:4%"></th>
     </tr></thead><tbody>`;
     
     for (const order of orders) {
@@ -402,10 +402,10 @@ function renderSymbolsTable(list = symbols) {
     let html = `<table>
         <thead>
             <tr>
-                <th>Symbol (用於下單)</th>
-                <th>Code (交易所代碼)</th>
-                <th>名稱</th>
-                <th>操作</th>
+                <th style="width:25%">Symbol (用於下單)</th>
+                <th style="width:20%">Code (交易所代碼)</th>
+                <th style="width:40%">名稱</th>
+                <th style="width:15%">操作</th>
             </tr>
         </thead>
         <tbody>`;
