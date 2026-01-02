@@ -146,35 +146,21 @@ docker compose up -d
 }
 ```
 
-## 📖 API 端點
+## 📖 API 文件
 
-### 交易端點
+完整 API 端點說明請參考 **FastAPI 自動產生文件**：
 
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| `/order` | POST | 下單（TradingView Webhook 使用） |
-| `/orders` | GET | 查詢委託紀錄 |
-| `/orders/{id}/recheck` | POST | 手動重新查詢訂單狀態 |
-| `/orders/export` | GET | 匯出委託紀錄 (CSV/JSON) |
-| `/positions` | GET | 查詢目前持倉 |
+```
+http://localhost:9879/docs
+```
 
-### 商品資訊
+或使用 NGROK 公開 URL：
 
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| `/futures` | GET | 取得所有期貨商品分類 |
-| `/futures/{code}` | GET | 取得特定期貨商品的所有合約 |
-| `/symbols` | GET | 取得所有可交易商品代碼 |
-| `/symbols/{symbol}` | GET | 查詢特定商品詳細資訊 |
-| `/contracts` | GET | 取得所有合約資訊 |
+```
+https://your-ngrok-url.ngrok-free.dev/docs
+```
 
-### 其他
-
-| 端點 | 方法 | 說明 |
-|------|------|------|
-| `/dashboard` | GET | Web 控制台 |
-| `/health` | GET | 健康檢查（含 Trading Worker 狀態） |
-| `/docs` | GET | API 文件 (Swagger UI) |
+> 💡 FastAPI 提供互動式 Swagger UI，可直接測試所有 API 端點。
 
 ## 🌐 NGROK 公開 URL 設定
 
