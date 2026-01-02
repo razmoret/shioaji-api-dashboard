@@ -19,31 +19,40 @@
 ## 🏗️ 系統架構
 
 ```
-┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
-│   TradingView   │ ───► │   FastAPI App   │ ───► │      Redis      │
-│    Webhook      │      │   (Port 9879)   │      │     (Queue)     │
-└─────────────────┘      └────────┬────────┘      └────────┬────────┘
-                                  │                        │
-                                  ▼                        ▼
-                         ┌─────────────────┐      ┌─────────────────┐
-                         │   PostgreSQL    │      │  Trading Worker │
-                         │    (Orders)     │      │  (Single Conn)  │
-                         └─────────────────┘      └────────┬────────┘
-                                                           │
-                                                           ▼
-                                                 ┌─────────────────┐
-                                                 │     Shioaji     │
-                                                 │    (SinoPac)    │
-                                                 └─────────────────┘
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│   TradingView   │ ───► │      NGROK      │ ───► │      NGINX      │ ───► │   FastAPI App   │
+│    Webhook      │      │  (HTTPS Tunnel) │      │  (Reverse Proxy)│      │   (Port 8000)   │
+└─────────────────┘      └─────────────────┘      └────────┬────────┘      └────────┬────────┘
+                                                          │                        │
+                                                   IP Whitelist            ┌───────┴───────┐
+                                                   Rate Limiting           ▼               ▼
+                                                                  ┌─────────────┐  ┌─────────────┐
+                                                                  │    Redis    │  │ PostgreSQL  │
+                                                                  │   (Queue)   │  │  (Orders)   │
+                                                                  └──────┬──────┘  └─────────────┘
+                                                                         │
+                                                                         ▼
+                                                                  ┌─────────────┐
+                                                                  │   Trading   │
+                                                                  │   Worker    │
+                                                                  └──────┬──────┘
+                                                                         │
+                                                                         ▼
+                                                                  ┌─────────────┐
+                                                                  │   Shioaji   │
+                                                                  │  (SinoPac)  │
+                                                                  └─────────────┘
 ```
 
 ### 元件說明
 
 | 元件 | 說明 |
 |------|------|
+| **NGROK** | HTTPS 隧道服務，自動處理 SSL 憑證，提供公開 URL |
+| **NGINX** | 反向代理，IP 白名單過濾、速率限制、安全標頭 |
 | **FastAPI App** | 處理 HTTP 請求的 API 服務，支援多 worker 擴展 |
 | **Redis** | 訊息佇列，用於 API 與 Trading Worker 之間的通訊 |
-| **Trading Worker** | 專用的交易服務，維護單一 Shioaji 連線 |
+| **Trading Worker** | 專用的交易服務，維護單一 Shioaji 連線，自動重連 |
 | **PostgreSQL** | 儲存訂單歷史紀錄 |
 
 ## 🚀 快速開始
@@ -52,18 +61,17 @@
 
 | 需求 | 說明 |
 |------|------|
-| **作業系統** | Linux、macOS、或 Windows（需啟用 WSL2） |
-| **Docker** | Docker Engine 20.10+ 與 Docker Compose V2 |
+| **作業系統** | Linux、macOS、或 Windows（支援原生 Docker，無需 WSL） |
+| **Docker** | Docker Desktop 或 Docker Engine 20.10+ 與 Docker Compose V2 |
 | **永豐金帳戶** | 需申請 Shioaji API 金鑰 |
 
-> 💡 **Windows 用戶注意：** 本系統使用 Bash 腳本，Windows 用戶請先安裝 [WSL2](https://docs.microsoft.com/zh-tw/windows/wsl/install)，並在 WSL 環境中執行所有指令。
+> ✅ **Windows 原生支援：** 本系統可直接在 Windows 上使用 Docker Desktop 運行，無需 WSL！只需執行 `docker compose up` 即可啟動所有服務。
 
 ### 1. 複製專案
 
 ```bash
 git clone <your-repo-url>
 cd shioaji-api-dashboard
-chmod +x shioaji-cli.sh  # 設定執行權限
 ```
 
 ### 2. 設定環境變數
@@ -88,14 +96,27 @@ SUPPORTED_FUTURES=MXF,TXF
 # CA 憑證 (僅實盤交易需要)
 CA_PATH=/app/certs/Sinopac.pfx
 CA_PASSWORD=your_ca_password_here
+
+# NGROK 設定 (用於公開 HTTPS URL)
+NGROK_AUTHTOKEN=your_ngrok_auth_token_here
+#NGROK_DOMAIN=your-custom-domain.ngrok.app  # 可選，付費方案才需要
+
+# IP 白名單 (可選，預設允許所有 IP)
+ALLOWED_IPS=0.0.0.0/0
 ```
 
 > 💡 **注意：** 資料庫連線設定 (DATABASE_URL, POSTGRES_*) 已在 docker-compose.yaml 中預設，無需手動設定。
 
 ### 3. 啟動服務
 
+**Linux/macOS：**
 ```bash
 ./shioaji-cli.sh start
+```
+
+**Windows (PowerShell/CMD)：**
+```bash
+docker compose up -d
 ```
 
 ### 4. 開啟控制台
@@ -152,6 +173,61 @@ CA_PASSWORD=your_ca_password_here
 | `/health` | GET | 健康檢查（含 Trading Worker 狀態） |
 | `/docs` | GET | API 文件 (Swagger UI) |
 
+## 🌐 NGROK 公開 URL 設定
+
+系統內建 NGROK 服務，自動提供 HTTPS URL，無需手動設定 SSL 憑證或網域！
+
+### 設定步驟
+
+1. 註冊 NGROK 帳號：https://dashboard.ngrok.com/signup
+2. 取得 Auth Token：https://dashboard.ngrok.com/get-started/your-authtoken
+3. 在 `.env` 設定 `NGROK_AUTHTOKEN`
+
+### 取得公開 URL
+
+啟動服務後，訪問 NGROK 狀態頁面：
+
+```
+http://localhost:4040/status
+```
+
+找到 **Tunnels → command_line → URL** 欄位，即為公開 HTTPS URL。
+
+例如：`https://unavailable-turbid-ellena.ngrok-free.dev`
+
+其他方式：
+
+```bash
+# 查看 Docker 日誌
+docker compose logs ngrok | grep "started tunnel"
+
+# 使用 NGROK API
+curl -s http://localhost:4040/api/tunnels | jq '.tunnels[0].public_url'
+```
+
+### 自訂網域（付費方案）
+
+如果使用付費方案，可設定固定網域，避免每次重啟 URL 變動：
+
+```env
+NGROK_DOMAIN=your-custom-domain.ngrok.app
+```
+
+## 🛡️ IP 白名單設定
+
+NGINX 支援 IP 白名單過濾，只允許指定 IP 存取 API：
+
+```env
+# 允許所有 IP（預設）
+ALLOWED_IPS=0.0.0.0/0
+
+# 只允許特定 IP
+ALLOWED_IPS=203.0.113.50
+
+# 允許多個 IP 或 CIDR 範圍
+ALLOWED_IPS=203.0.113.50,198.51.100.0/24,10.0.0.0/8
+```
+
 ## 🔗 TradingView 設定
 
 <p align="center">
@@ -160,15 +236,19 @@ CA_PASSWORD=your_ca_password_here
 
 ### 1. Webhook URL
 
+使用 NGROK 提供的公開 HTTPS URL（從 http://localhost:4040 取得）：
+
 **模擬模式（測試用）：**
 ```
-http://your-domain.com:9879/order
+https://your-ngrok-url.ngrok-free.app/order
 ```
 
 **實盤模式：**
 ```
-http://your-domain.com:9879/order?simulation=false
+https://your-ngrok-url.ngrok-free.app/order?simulation=false
 ```
+
+> 💡 **注意：** TradingView Webhook 要求 HTTPS URL，系統已透過 NGROK 自動處理！
 
 ### 2. Webhook 訊息格式
 
@@ -299,8 +379,10 @@ shioaji-api-dashboard/
 
 | 服務 | 說明 | Port |
 |------|------|------|
-| `api` | FastAPI 應用（4 workers） | 9879 |
-| `trading-worker` | Shioaji 連線管理 | - |
+| `nginx` | 反向代理、IP 白名單 | 9879 |
+| `ngrok` | HTTPS 隧道（Web 介面） | 4040 |
+| `api` | FastAPI 應用（4 workers） | 8000 (internal) |
+| `trading-worker` | Shioaji 連線管理、自動重連 | - |
 | `redis` | 訊息佇列 | 6379 (internal) |
 | `db` | PostgreSQL 資料庫 | 5432 (internal) |
 
@@ -352,9 +434,10 @@ docker compose logs -f api
 
 1. **模擬模式優先** - 請先使用模擬模式測試，確認策略正確後再切換實盤
 2. **憑證安全** - 請勿將 `.env` 和 `certs/` 資料夾提交至版本控制
-3. **網路安全** - 建議使用 HTTPS 和防火牆保護 API 端點
+3. **網路安全** - 系統已內建 HTTPS (NGROK) 和 IP 白名單 (NGINX)
 4. **交易風險** - 自動交易有風險，請謹慎使用
 5. **連線限制** - 系統使用 Redis 佇列確保只維持單一 Shioaji 連線，避免 "Too Many Connections" 錯誤
+6. **自動重連** - Trading Worker 會自動重試失敗的請求（最多 3 次），並在 Token 過期時自動重新連線
 
 ## 🔧 故障排除
 
