@@ -45,20 +45,20 @@ run_migration() {
         "SELECT 1 FROM schema_migrations WHERE version = '$version'" 2>/dev/null || echo "")
     
     if [ "$applied" = "1" ]; then
-        echo "  ✓ $version (already applied)"
+        echo "  ??$version (already applied)"
         return 0
     fi
     
-    echo "  → Applying: $version"
+    echo "  ??Applying: $version"
     
     # Run the migration
     if psql -U "$USER" -d "$DATABASE" -f "$file" > /dev/null 2>&1; then
         # Record it as applied
         psql -U "$USER" -d "$DATABASE" -c \
             "INSERT INTO schema_migrations (version) VALUES ('$version')" > /dev/null 2>&1
-        echo "  ✓ $version (applied)"
+        echo "  ??$version (applied)"
     else
-        echo "  ✗ $version (FAILED)"
+        echo "  ??$version (FAILED)"
         exit 1
     fi
 }
