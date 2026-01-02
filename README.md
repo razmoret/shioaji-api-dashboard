@@ -193,7 +193,7 @@ http://localhost:4040/status
 
 找到 **Tunnels → command_line → URL** 欄位，即為公開 HTTPS URL。
 
-例如：`https://unavailable-turbid-ellena.ngrok-free.dev`
+例如：`https://***.ngrok-free.dev`
 
 其他方式：
 
